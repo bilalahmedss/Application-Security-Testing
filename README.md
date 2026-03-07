@@ -1,10 +1,9 @@
 # DVWA Security Lab Report
 
-**Name:** [Your Full Name]  
-**Student ID:** [Your Student ID]  
-**Course:** [Course Name / Code]  
-**Instructor:** [Instructor Name]  
-**Date:** [Submission Date]  
+**Name:** Bilal Ahmed  
+**Student ID:** 08018  
+**Course:** Cybersecurity: Theory and Tools
+**Date:** 7th March 2026  
 **Institution:** Habib University, Karachi  
 
 ---
