@@ -54,7 +54,7 @@ docker run -d --name dvwa -p 8080:80 vulnerables/web-dvwa
 
 DVWA is accessible at `http://localhost:8080`. Database initialized via the setup page. Login confirmed with `admin / password`.
 
-![DVWA Dashboard](images/DVWA_dashboard.png)
+![DVWA Dashboard](images/dvwa_dashboard.png)
 
 ---
 
