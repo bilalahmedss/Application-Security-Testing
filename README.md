@@ -54,7 +54,7 @@ docker run -d --name dvwa -p 8080:80 vulnerables/web-dvwa
 
 DVWA is accessible at `http://localhost:8080`. Database initialized via the setup page. Login confirmed with `admin / password`.
 
-![DVWA Dashboard](images/dvwa_dashboard.png)
+![DVWA Dashboard](images/DVWA_dashboard.png)
 
 ---
 
@@ -76,46 +76,46 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 ```
 
 **Result:**  
-[Describe what happened — all user records returned, etc.]
+All 5 user records were dumped - admin, Gordon Brown, Hack Me, Pablo Picasso, and Bob Smith. The database returned every row because the injected condition `'1'='1` is always true.
 
 ![SQL Injection Low](images/SQL_low.png)
 
 **Why it worked:**  
-[User input is directly concatenated into the SQL query with no escaping or parameterization. Explain the vulnerable query structure.]
+The input is concatenated directly into the SQL query with no sanitization. The resulting query becomes `SELECT * FROM users WHERE id='1' OR '1'='1'` which returns all rows.
 
 ---
 
 #### Medium
 
-**Payload / Approach:**  
-[Describe the approach — dropdown replaced the text field, Burp Suite interception used, etc.]
+**Payload:**  
+Security level changed to Medium. A dropdown replaced the free text field. Burp Suite was used to intercept the POST request and the `id` parameter was manually changed to `1 OR 1=1` before forwarding.
 
 ```sql
-[Paste medium-level payload if used]
+1 OR 1=1
 ```
 
 **Result:**  
-[Describe what happened.]
+All 5 users were still returned. The attack succeeded despite the dropdown restricting the UI, because the server-side query was still vulnerable.
 
 ![SQL Injection Medium](images/SQL_Medium.png)
 
 **Analysis:**  
-[Explain what changed at Medium — input surface changed, some filtering added, but still exploitable or not.]
+Medium only changes the input surface from a text box to a dropdown. It adds no real server-side protection. Intercepting the request with Burp and modifying the parameter directly bypasses the UI restriction entirely.
 
 ---
 
 #### High
 
-**Payload / Approach:**  
-[Describe your attempt.]
+**Payload:**  
+Input is entered via a separate session popup window. Tried the same payload `1' OR '1'='1`.
 
 **Result:**  
-[Describe that it failed and why.]
+Only one record returned (admin). The injection partially worked but the output was limited to a single row due to a `LIMIT 1` clause added to the query.
 
-![SQL Injection High](images/SQL_high.png)
+![SQL Injection High](images/SQL_High.png)
 
 **Defense Mechanism:**  
-[DVWA uses PDO prepared statements at High. User input is treated as a literal string and cannot alter the query structure.]
+High level uses PDO prepared statements. User input is treated as a literal string and cannot alter the query structure. The `LIMIT 1` clause also restricts output even if injection partially succeeds.
 
 ---
 
@@ -123,10 +123,10 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 |---|---|
 | Vulnerability | SQL Injection |
 | Security Levels Tested | Low, Medium, High |
-| Payload | `1' OR '1'='1` |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Payload | `1' OR '1'='1` / `1 OR 1=1` |
+| Low Result | All 5 users dumped |
+| Medium Result | All 5 users dumped via Burp interception |
+| High Result | Single record returned, full dump prevented |
 | OWASP Category | A03:2021 Injection |
 
 ---
@@ -135,46 +135,43 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 
 #### Low
 
-**Payload:**
+**Payload:** `1' AND 1=1#` and `1' AND 1=2#`
 
-```sql
-1' AND SLEEP(5)--
-```
-
-**Result:**  
-[Describe the time delay or boolean response observed.]
+**Result:**
+`1' AND 1=1#` returned "User ID exists in the database." Switching to `1' AND 1=2#` returned "User ID is MISSING." The database responds differently to true vs false conditions confirming boolean-based blind injection.
 
 ![SQL Injection Blind Low](images/SQL_blind_low.png)
 
-**Why it worked:**  
-[No output is shown but the database still executes the injected query. Explain boolean-based or time-based blind SQLi.]
+**Why it worked:**
+No data is displayed on screen but the query still executes the injected logic. By observing different responses to true vs false conditions we can extract information without ever seeing raw data. This is boolean-based blind SQLi.
 
 ---
 
 #### Medium
 
-**Payload / Approach:**  
-[Describe the approach.]
+**Payload:** `1 AND 1=1` via Burp Suite interception
 
-**Result:**  
-[Describe what happened.]
+**Result:**
+Same true/false behavior confirmed. Intercepted the POST request in Burp, modified the id parameter directly. Server returned exists for true and missing for false.
 
 ![SQL Injection Blind Medium](images/SQL_blind_medium.png)
 
-**Analysis:**  
-[Explain Medium level changes.]
+**Analysis:**
+Medium restricts the UI to a dropdown but the server-side query is still unsanitized. Intercepting and modifying the request in Burp bypasses the UI restriction entirely.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that it failed and why.]
+**Payload:** `1' AND 1=2#` via cookie input popup
+
+**Result:**
+Attack still succeeded. High level moves input to a cookie parameter via a separate popup but does not sanitize it. True condition returned exists, false condition returned missing.
 
 ![SQL Injection Blind High](images/SQL_blind_high.png)
 
-**Defense Mechanism:**  
-[Explain prepared statements preventing blind injection.]
+**Defense Mechanism:**
+The intended defense was obscuring the input by moving it to a cookie. However the cookie value is still passed unsanitized to the SQL query. Proper prevention requires prepared statements regardless of where input originates.
 
 ---
 
@@ -182,10 +179,12 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 |---|---|
 | Vulnerability | SQL Injection (Blind) |
 | Security Levels Tested | Low, Medium, High |
-| Payload | `1' AND SLEEP(5)--` |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Payload | `1' AND 1=1#` / `1' AND 1=2#` |
+| Medium Payload | `1 AND 1=1` via Burp Suite |
+| High Payload | `1' AND 1=1#` via cookie popup |
+| Low Result | Boolean response confirmed injection |
+| Medium Result | Boolean response confirmed via Burp |
+| High Result | Still vulnerable via unsanitized cookie |
 | OWASP Category | A03:2021 Injection |
 
 ---
@@ -194,52 +193,43 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 
 #### Low
 
-**Payload:**
+**Payload:** `<script>alert('XSS')</script>`
 
-```html
-<script>alert('XSS')</script>
-```
-
-**Result:**  
-[Describe the alert popup that appeared.]
+**Result:**
+Alert popup fired with "XSS". The script tag was reflected directly in the page response and executed by the browser.
 
 ![XSS Reflected Low](images/XSS_reflected_low.png)
 
-**Why it worked:**  
-[Input is reflected directly in the response with no sanitization or encoding.]
+**Why it worked:**
+Input is reflected back in the response with zero sanitization. The browser sees the script tag and executes it immediately.
 
 ---
 
 #### Medium
 
-**Payload / Approach:**
+**Payload:** `<img src=x onerror=alert('XSS')>`
 
-```html
-<img src=x onerror=alert('XSS')>
-```
-
-**Result:**  
-[Describe whether the bypass worked.]
+**Result:**
+Initial `<script>` payload was stripped and rendered as plain text. The img onerror bypass fired the alert successfully.
 
 ![XSS Reflected Medium](images/XSS_reflected_medium.png)
 
-**Analysis:**  
-[Medium strips `<script>` tags but does not filter other HTML tags. The img onerror bypass works because the filter is not comprehensive.]
+**Analysis:**
+Medium filters `<script>` tags but does not sanitize other HTML tags. The img onerror attribute executes JavaScript without needing a script tag at all.
 
 ---
 
 #### High
 
-**Payload / Approach:**  
-[Describe your attempt.]
+**Payload:** `<img src=x onerror=alert('XSS')>`
 
-**Result:**  
-[Describe that it failed.]
+**Result:**
+Same img onerror bypass worked at High as well. Alert fired successfully. High level did not fully prevent the attack.
 
 ![XSS Reflected High](images/XSS_reflected_high.png)
 
-**Defense Mechanism:**  
-[High uses a strict whitelist. Only expected characters pass through. Most HTML tags are rejected outright.]
+**Defense Mechanism:**
+High attempts stricter filtering but still fails to block event-based handlers like onerror. Full prevention requires output encoding — converting special characters to HTML entities so the browser never interprets input as code.
 
 ---
 
@@ -247,10 +237,12 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 |---|---|
 | Vulnerability | XSS Reflected |
 | Security Levels Tested | Low, Medium, High |
-| Payload | `<script>alert('XSS')</script>` |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Payload | `<script>alert('XSS')</script>` |
+| Medium Payload | `<img src=x onerror=alert('XSS')>` |
+| High Payload | `<img src=x onerror=alert('XSS')>` |
+| Low Result | Alert fired |
+| Medium Result | Script tag stripped, img bypass worked |
+| High Result | Still vulnerable via img onerror |
 | OWASP Category | A03:2021 Injection |
 
 ---
@@ -259,46 +251,43 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 
 #### Low
 
-**Payload:**
+**Payload:** `<script>alert('Stored XSS')</script>` in the Message field
 
-```html
-<script>alert('Stored XSS')</script>
-```
-
-**Result:**  
-[Describe that the payload was saved and the alert fires for every visitor.]
+**Result:**
+Alert popup fired with "Stored XSS". The script was saved to the database and executed every time the page loaded. Maxlength attribute on the message field was changed via browser inspect to allow the full payload.
 
 ![XSS Stored Low](images/XSS_stored_low.png)
 
-**Why it worked:**  
-[Input is saved to the database without sanitization and rendered raw on page load for all users.]
+**Why it worked:**
+Input is saved to the database with no sanitization and rendered raw on every page load. Any user visiting the page triggers the script automatically.
 
 ---
 
 #### Medium
 
-**Payload / Approach:**  
-[Describe the bypass attempt.]
+**Payload:** `<img src=x onerror=alert('Stored XSS')>`
 
-**Result:**  
-[Describe what happened.]
+**Result:**
+Script tags were stripped but the img onerror bypass fired the alert successfully. Payload was stored and executed on page load.
 
 ![XSS Stored Medium](images/XSS_stored_medium.png)
 
-**Analysis:**  
-[Explain Medium level filtering on stored input.]
+**Analysis:**
+Medium filters `<script>` tags on stored input but ignores other HTML tags and event handlers. The img onerror attribute executes JavaScript without a script tag.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that it failed.]
+**Payload:** `<img src=x onerror=alert('Stored XSS')>`
+
+**Result:**
+Payload was saved but the message field showed empty. No alert fired. High level stripped the entire payload before storing it in the database.
 
 ![XSS Stored High](images/XSS_stored_high.png)
 
-**Defense Mechanism:**  
-[High encodes special characters on output. The script tags are rendered as plain text, not executed.]
+**Defense Mechanism:**
+High level sanitizes input before storing it and encodes output before rendering. Special characters are converted to HTML entities so the browser treats them as text, not code.
 
 ---
 
@@ -306,10 +295,12 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 |---|---|
 | Vulnerability | XSS Stored |
 | Security Levels Tested | Low, Medium, High |
-| Payload | `<script>alert('Stored XSS')</script>` |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Payload | `<script>alert('Stored XSS')</script>` |
+| Medium Payload | `<img src=x onerror=alert('Stored XSS')>` |
+| High Payload | `<img src=x onerror=alert('Stored XSS')>` |
+| Low Result | Alert fired on page load |
+| Medium Result | Script stripped, img bypass worked |
+| High Result | Payload stripped, no execution |
 | OWASP Category | A03:2021 Injection |
 
 ---
