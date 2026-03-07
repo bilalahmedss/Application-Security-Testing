@@ -1,10 +1,13 @@
 # DVWA Security Lab Report
 
-**Name:** Bilal Ahmed  
-**Student ID:** 08018  
+
+**Student Name:** Bilal Ahmed
+
+**Student ID:** 08018
+
 **Course:** Cybersecurity: Theory and Tools
-**Date:** 7th March 2026  
-**Institution:** Habib University, Karachi  
+
+**Submission Date:** 1st March 2026
 
 ---
 
