@@ -1,6 +1,5 @@
 # DVWA Security Lab Report
 
-
 **Student Name:** Bilal Ahmed
 
 **Student ID:** 08018
@@ -13,8 +12,8 @@
 
 ## Table of Contents
 
-1. [Environment Setup](#1-environment-setup)
-2. [Docker Inspection](#2-docker-inspection)
+1. [Install Docker](#1-install-docker)
+2. [Deploy DVWA in Docker](#2-deploy-dvwa-in-docker)
 3. [Vulnerability Testing](#3-vulnerability-testing)
    - [SQL Injection](#31-sql-injection)
    - [SQL Injection (Blind)](#32-sql-injection-blind)
@@ -36,78 +35,26 @@
 
 ---
 
-## 1. Environment Setup
+## 1. Install Docker
 
 ### Docker Installation
 
 ```
-[Paste output of: docker --version]
+Docker version 29.2.1, build a5c7197
 ```
 
 ![Docker Version](images/Docker_version.png)
 
-### DVWA Deployment
+## 2. Deploy DVWA in Docker
 
 ```bash
 docker pull vulnerables/web-dvwa
 docker run -d --name dvwa -p 8080:80 vulnerables/web-dvwa
 ```
 
-```
-[Paste output of: docker ps]
-```
-
-![Docker PS](images/Docker_ps.png)
-
 DVWA is accessible at `http://localhost:8080`. Database initialized via the setup page. Login confirmed with `admin / password`.
 
-![DVWA Login](images/DVWA_login.png)
-
 ![DVWA Dashboard](images/DVWA_dashboard.png)
-
----
-
-## 2. Docker Inspection
-
-### docker inspect dvwa
-
-```
-[Paste relevant output of: docker inspect dvwa]
-```
-
-![Docker Inspect](images/Docker_inspect.png)
-
-### docker logs dvwa
-
-```
-[Paste relevant output of: docker logs dvwa]
-```
-
-![Docker Logs](images/Docker_logs.png)
-
-### Container Shell Access
-
-```bash
-docker exec -it dvwa /bin/bash
-ls /var/www/html
-```
-
-```
-[Paste output of: ls /var/www/html]
-```
-
-![Container Shell](images/Docker_exec_shell.png)
-
-### Analysis
-
-**Application File Location:**  
-DVWA stores all application files at `/var/www/html` inside the container. [Add any additional observations about the file structure.]
-
-**Backend Technology:**  
-DVWA runs on Apache with PHP as the scripting language and MySQL as the database backend. [Add version details if visible in logs or config files.]
-
-**Docker Isolation:**  
-[Explain how Docker uses Linux namespaces and cgroups to isolate this container from the host OS. Cover networking, filesystem, and process isolation.]
 
 ---
 
@@ -123,6 +70,7 @@ DVWA runs on Apache with PHP as the scripting language and MySQL as the database
 #### Low
 
 **Payload:**
+
 ```sql
 1' OR '1'='1
 ```
@@ -188,6 +136,7 @@ DVWA runs on Apache with PHP as the scripting language and MySQL as the database
 #### Low
 
 **Payload:**
+
 ```sql
 1' AND SLEEP(5)--
 ```
@@ -246,6 +195,7 @@ DVWA runs on Apache with PHP as the scripting language and MySQL as the database
 #### Low
 
 **Payload:**
+
 ```html
 <script>alert('XSS')</script>
 ```
@@ -263,6 +213,7 @@ DVWA runs on Apache with PHP as the scripting language and MySQL as the database
 #### Medium
 
 **Payload / Approach:**
+
 ```html
 <img src=x onerror=alert('XSS')>
 ```
@@ -309,6 +260,7 @@ DVWA runs on Apache with PHP as the scripting language and MySQL as the database
 #### Low
 
 **Payload:**
+
 ```html
 <script>alert('Stored XSS')</script>
 ```
@@ -367,6 +319,7 @@ DVWA runs on Apache with PHP as the scripting language and MySQL as the database
 #### Low
 
 **Payload:**
+
 ```html
 <img src=x onerror=alert(1)>
 ```
@@ -490,6 +443,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 #### Low
 
 **Payload:**
+
 ```
 127.0.0.1; ls
 ```
@@ -507,6 +461,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 #### Medium
 
 **Payload / Approach:**
+
 ```
 127.0.0.1 && ls
 ```
@@ -550,6 +505,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 #### Low
 
 **Payload:**
+
 ```
 http://localhost:8080/vulnerabilities/fi/?page=../../etc/passwd
 ```
