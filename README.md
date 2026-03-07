@@ -97,7 +97,7 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 **Result:**  
 [Describe what happened.]
 
-![SQL Injection Medium](images/SQL_medium.png)
+![SQL Injection Medium](images/SQL_Medium.png)
 
 **Analysis:**  
 [Explain what changed at Medium — input surface changed, some filtering added, but still exploitable or not.]
