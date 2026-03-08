@@ -43,7 +43,7 @@
 Docker version 29.2.1, build a5c7197
 ```
 
-![Docker Version](images/Docker_version.png)
+![docker version](images/docker_version.png)
 
 ## 2. Deploy DVWA in Docker
 
@@ -54,7 +54,7 @@ docker run -d --name dvwa -p 8080:80 vulnerables/web-dvwa
 
 DVWA is accessible at `http://localhost:8080`. Database initialized via the setup page. Login confirmed with `admin / password`.
 
-![DVWA Dashboard](images/DVWA_dashboard.png)
+![dvwa dashboard](images/dvwa_dashboard.png)
 
 ---
 
@@ -78,7 +78,7 @@ DVWA is accessible at `http://localhost:8080`. Database initialized via the setu
 **Result:**  
 All 5 user records were dumped - admin, Gordon Brown, Hack Me, Pablo Picasso, and Bob Smith. The database returned every row because the injected condition `'1'='1` is always true.
 
-![SQL Injection Low](images/SQL_low.png)
+![sql injection low](images/sql_low.png)
 
 **Why it worked:**  
 The input is concatenated directly into the SQL query with no sanitization. The resulting query becomes `SELECT * FROM users WHERE id='1' OR '1'='1'` which returns all rows.
@@ -97,7 +97,7 @@ Security level changed to Medium. A dropdown replaced the free text field. Burp 
 **Result:**  
 All 5 users were still returned. The attack succeeded despite the dropdown restricting the UI, because the server-side query was still vulnerable.
 
-![SQL Injection Medium](images/SQL_Medium.png)
+![sql injection medium](images/sql_medium.png)
 
 **Analysis:**  
 Medium only changes the input surface from a text box to a dropdown. It adds no real server-side protection. Intercepting the request with Burp and modifying the parameter directly bypasses the UI restriction entirely.
@@ -112,7 +112,7 @@ Input is entered via a separate session popup window. Tried the same payload `1'
 **Result:**  
 Only one record returned (admin). The injection partially worked but the output was limited to a single row due to a `LIMIT 1` clause added to the query.
 
-![SQL Injection High](images/SQL_High.png)
+![sql injection high](images/sql_high.png)
 
 **Defense Mechanism:**  
 High level uses PDO prepared statements. User input is treated as a literal string and cannot alter the query structure. The `LIMIT 1` clause also restricts output even if injection partially succeeds.
@@ -140,7 +140,7 @@ High level uses PDO prepared statements. User input is treated as a literal stri
 **Result:**
 `1' AND 1=1#` returned "User ID exists in the database." Switching to `1' AND 1=2#` returned "User ID is MISSING." The database responds differently to true vs false conditions confirming boolean-based blind injection.
 
-![SQL Injection Blind Low](images/SQL_blind_low.png)
+![sql injection blind low](images/sql_blind_low.png)
 
 **Why it worked:**
 No data is displayed on screen but the query still executes the injected logic. By observing different responses to true vs false conditions we can extract information without ever seeing raw data. This is boolean-based blind SQLi.
@@ -154,7 +154,7 @@ No data is displayed on screen but the query still executes the injected logic. 
 **Result:**
 Same true/false behavior confirmed. Intercepted the POST request in Burp, modified the id parameter directly. Server returned exists for true and missing for false.
 
-![SQL Injection Blind Medium](images/SQL_blind_medium.png)
+![sql injection blind medium](images/sql_blind_medium.png)
 
 **Analysis:**
 Medium restricts the UI to a dropdown but the server-side query is still unsanitized. Intercepting and modifying the request in Burp bypasses the UI restriction entirely.
@@ -168,7 +168,7 @@ Medium restricts the UI to a dropdown but the server-side query is still unsanit
 **Result:**
 Attack still succeeded. High level moves input to a cookie parameter via a separate popup but does not sanitize it. True condition returned exists, false condition returned missing.
 
-![SQL Injection Blind High](images/SQL_blind_high.png)
+![sql injection blind high](images/sql_blind_high.png)
 
 **Defense Mechanism:**
 The intended defense was obscuring the input by moving it to a cookie. However the cookie value is still passed unsanitized to the SQL query. Proper prevention requires prepared statements regardless of where input originates.
@@ -198,7 +198,7 @@ The intended defense was obscuring the input by moving it to a cookie. However t
 **Result:**
 Alert popup fired with "XSS". The script tag was reflected directly in the page response and executed by the browser.
 
-![XSS Reflected Low](images/XSS_reflected_low.png)
+![xss reflected low](images/xss_reflected_low.png)
 
 **Why it worked:**
 Input is reflected back in the response with zero sanitization. The browser sees the script tag and executes it immediately.
@@ -212,7 +212,7 @@ Input is reflected back in the response with zero sanitization. The browser sees
 **Result:**
 Initial `<script>` payload was stripped and rendered as plain text. The img onerror bypass fired the alert successfully.
 
-![XSS Reflected Medium](images/XSS_reflected_medium.png)
+![xss reflected medium](images/xss_reflected_medium.png)
 
 **Analysis:**
 Medium filters `<script>` tags but does not sanitize other HTML tags. The img onerror attribute executes JavaScript without needing a script tag at all.
@@ -226,7 +226,7 @@ Medium filters `<script>` tags but does not sanitize other HTML tags. The img on
 **Result:**
 Same img onerror bypass worked at High as well. Alert fired successfully. High level did not fully prevent the attack.
 
-![XSS Reflected High](images/XSS_reflected_high.png)
+![xss reflected high](images/xss_reflected_high.png)
 
 **Defense Mechanism:**
 High attempts stricter filtering but still fails to block event-based handlers like onerror. Full prevention requires output encoding — converting special characters to HTML entities so the browser never interprets input as code.
@@ -256,7 +256,7 @@ High attempts stricter filtering but still fails to block event-based handlers l
 **Result:**
 Alert popup fired with "Stored XSS". The script was saved to the database and executed every time the page loaded. Maxlength attribute on the message field was changed via browser inspect to allow the full payload.
 
-![XSS Stored Low](images/XSS_stored_low.png)
+![xss stored low](images/xss_stored_low.png)
 
 **Why it worked:**
 Input is saved to the database with no sanitization and rendered raw on every page load. Any user visiting the page triggers the script automatically.
@@ -270,7 +270,7 @@ Input is saved to the database with no sanitization and rendered raw on every pa
 **Result:**
 Script tags were stripped but the img onerror bypass fired the alert successfully. Payload was stored and executed on page load.
 
-![XSS Stored Medium](images/XSS_stored_medium.png)
+![xss stored medium](images/xss_stored_medium.png)
 
 **Analysis:**
 Medium filters `<script>` tags on stored input but ignores other HTML tags and event handlers. The img onerror attribute executes JavaScript without a script tag.
@@ -284,7 +284,7 @@ Medium filters `<script>` tags on stored input but ignores other HTML tags and e
 **Result:**
 Payload was saved but the message field showed empty. No alert fired. High level stripped the entire payload before storing it in the database.
 
-![XSS Stored High](images/XSS_stored_high.png)
+![xss stored high](images/xss_stored_high.png)
 
 **Defense Mechanism:**
 High level sanitizes input before storing it and encodes output before rendering. Special characters are converted to HTML entities so the browser treats them as text, not code.
@@ -318,7 +318,7 @@ High level sanitizes input before storing it and encodes output before rendering
 **Result:**  
 [Describe the alert that fired via DOM manipulation.]
 
-![XSS DOM Low](images/XSS_dom_low.png)
+![xss dom low](images/xss_dom_low.png)
 
 **Why it worked:**  
 [Input is written directly into the DOM via JavaScript without sanitization. The browser executes it.]
@@ -333,7 +333,7 @@ High level sanitizes input before storing it and encodes output before rendering
 **Result:**  
 [Describe what happened.]
 
-![XSS DOM Medium](images/XSS_dom_medium.png)
+![xss dom medium](images/xss_dom_medium.png)
 
 **Analysis:**  
 [Explain Medium DOM-based filtering changes.]
@@ -345,7 +345,7 @@ High level sanitizes input before storing it and encodes output before rendering
 **Result:**  
 [Describe that it failed.]
 
-![XSS DOM High](images/XSS_dom_high.png)
+![xss dom high](images/xss_dom_high.png)
 
 **Defense Mechanism:**  
 [Explain High level defense against DOM XSS.]
@@ -383,7 +383,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 **Result:**  
 [Describe the password change succeeding without user interaction.]
 
-![CSRF Low](images/CSRF_low.png)
+![csrf low](images/csrf_low.png)
 
 **Why it worked:**  
 [No CSRF token is present. Any request with a valid session cookie is accepted regardless of origin.]
@@ -398,7 +398,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 **Result:**  
 [Describe what happened.]
 
-![CSRF Medium](images/CSRF_medium.png)
+![csrf medium](images/csrf_medium.png)
 
 **Analysis:**  
 [Medium checks the Referer header. Explain whether this is bypassable and how.]
@@ -410,7 +410,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 **Result:**  
 [Describe that it failed.]
 
-![CSRF High](images/CSRF_high.png)
+![csrf high](images/csrf_high.png)
 
 **Defense Mechanism:**  
 [High requires a CSRF token embedded in the form. A forged request from another origin cannot know the token, so the server rejects it.]
@@ -442,7 +442,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 **Result:**  
 [Describe both commands executing — ping and ls output visible.]
 
-![Command Injection Low](images/CMD_low.png)
+![command injection low](images/cmd_low.png)
 
 **Why it worked:**  
 [Input is passed directly to a system shell call. Shell metacharacters like `;` are not stripped.]
@@ -460,7 +460,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 **Result:**  
 [Describe whether the bypass worked.]
 
-![Command Injection Medium](images/CMD_medium.png)
+![command injection medium](images/cmd_medium.png)
 
 **Analysis:**  
 [Medium strips some characters like `;` but misses others like `&&`. Explain which ones worked.]
@@ -472,7 +472,7 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 **Result:**  
 [Describe that it failed.]
 
-![Command Injection High](images/CMD_high.png)
+![command injection high](images/cmd_high.png)
 
 **Defense Mechanism:**  
 [High uses a strict character whitelist on input. Shell metacharacters are completely blocked.]
@@ -504,7 +504,7 @@ http://localhost:8080/vulnerabilities/fi/?page=../../etc/passwd
 **Result:**  
 [Describe the /etc/passwd file contents being displayed.]
 
-![File Inclusion Low](images/FI_low.png)
+![file inclusion low](images/fi_low.png)
 
 **Why it worked:**  
 [The `page` parameter is passed directly to a PHP include statement with no path restriction.]
@@ -519,7 +519,7 @@ http://localhost:8080/vulnerabilities/fi/?page=../../etc/passwd
 **Result:**  
 [Describe what happened.]
 
-![File Inclusion Medium](images/FI_medium.png)
+![file inclusion medium](images/fi_medium.png)
 
 **Analysis:**  
 [Medium adds some path restrictions but may still be bypassable. Explain your findings.]
@@ -531,7 +531,7 @@ http://localhost:8080/vulnerabilities/fi/?page=../../etc/passwd
 **Result:**  
 [Describe that it failed.]
 
-![File Inclusion High](images/FI_high.png)
+![file inclusion high](images/fi_high.png)
 
 **Defense Mechanism:**  
 [High uses a hardcoded allowlist of permitted filenames. Any value outside the allowlist is rejected.]
@@ -564,7 +564,7 @@ Uploaded a PHP webshell as a `.php` file with no restrictions.
 **Result:**  
 [Describe the file being accepted and the shell being accessible at its upload path.]
 
-![File Upload Low](images/FU_low.png)
+![file upload low](images/fu_low.png)
 
 **Why it worked:**  
 [No file type validation exists at Low. Any file extension is accepted.]
@@ -579,7 +579,7 @@ Uploaded a PHP webshell as a `.php` file with no restrictions.
 **Result:**  
 [Describe whether the bypass worked.]
 
-![File Upload Medium](images/FU_medium.png)
+![file upload medium](images/fu_medium.png)
 
 **Analysis:**  
 [Medium checks the MIME type sent in the request header, not the actual file content. Changing the header in Burp bypasses this check.]
@@ -591,7 +591,7 @@ Uploaded a PHP webshell as a `.php` file with no restrictions.
 **Result:**  
 [Describe that it failed.]
 
-![File Upload High](images/FU_high.png)
+![file upload high](images/fu_high.png)
 
 **Defense Mechanism:**  
 [High inspects the actual file content and extension. A PHP file masquerading as an image is detected and rejected.]
@@ -625,7 +625,7 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 **Result:**  
 [Describe credentials found and how long it took.]
 
-![Brute Force Low](images/BF_low.png)
+![brute force low](images/bf_low.png)
 
 **Why it worked:**  
 [No rate limiting, lockout policy, or delay exists at Low. Requests are processed as fast as they arrive.]
@@ -640,7 +640,7 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 **Result:**  
 [Describe what changed — e.g. a delay was added.]
 
-![Brute Force Medium](images/BF_medium.png)
+![brute force medium](images/bf_medium.png)
 
 **Analysis:**  
 [Explain Medium level changes — e.g. sleep delay added per request, slowing but not stopping brute force.]
@@ -652,7 +652,7 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 **Result:**  
 [Describe that automated brute force failed.]
 
-![Brute Force High](images/BF_high.png)
+![brute force high](images/bf_high.png)
 
 **Defense Mechanism:**  
 [High requires a CSRF token that changes with every request. An automated tool cannot retrieve and replay it fast enough, making brute force impractical.]
@@ -681,7 +681,7 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 **Result:**  
 [Describe the password change succeeding without solving the CAPTCHA.]
 
-![Insecure CAPTCHA Low](images/CAPTCHA_low.png)
+![insecure captcha low](images/captcha_low.png)
 
 **Why it worked:**  
 [CAPTCHA validation is either client-side only or the step parameter can be manipulated to jump directly to the final action without verification.]
@@ -696,7 +696,7 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 **Result:**  
 [Describe what happened.]
 
-![Insecure CAPTCHA Medium](images/CAPTCHA_medium.png)
+![insecure captcha medium](images/captcha_medium.png)
 
 **Analysis:**  
 [Explain Medium level change and whether it was still bypassable.]
@@ -708,7 +708,7 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 **Result:**  
 [Describe that it failed.]
 
-![Insecure CAPTCHA High](images/CAPTCHA_high.png)
+![insecure captcha high](images/captcha_high.png)
 
 **Defense Mechanism:**  
 [Explain High level server-side CAPTCHA enforcement.]
@@ -736,7 +736,7 @@ Clicked "Generate" multiple times and observed the session ID values in the cook
 **Result:**  
 [Describe the sequential IDs observed — 1, 2, 3, etc.]
 
-![Weak Session IDs Low](images/Session_low.png)
+![weak session ids low](images/session_low.png)
 
 **Why it worked:**  
 [Session IDs are generated using a simple counter. They are predictable, making session hijacking trivial.]
@@ -751,7 +751,7 @@ Clicked "Generate" multiple times and observed the session ID values in the cook
 **Result:**  
 [Describe whether the IDs improved.]
 
-![Weak Session IDs Medium](images/Session_medium.png)
+![weak session ids medium](images/session_medium.png)
 
 **Analysis:**  
 [Explain Medium level session ID generation — e.g. time-based, still somewhat predictable.]
@@ -763,7 +763,7 @@ Clicked "Generate" multiple times and observed the session ID values in the cook
 **Result:**  
 [Describe the session ID format at High.]
 
-![Weak Session IDs High](images/Session_high.png)
+![weak session ids high](images/session_high.png)
 
 **Defense Mechanism:**  
 [High uses a cryptographically secure random value for session IDs. Brute forcing or predicting them is not feasible.]
@@ -834,7 +834,7 @@ Clicked "Generate" multiple times and observed the session ID values in the cook
 [Paste your nginx.conf here]
 ```
 
-![Nginx Config](images/Nginx_config.png)
+![nginx config](images/nginx_config.png)
 
 ### Self-Signed Certificate
 
@@ -845,15 +845,15 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 
 [Paste openssl output and describe the certificate details.]
 
-![HTTPS Browser](images/HTTPS_browser.png)
+![https browser](images/https_browser.png)
 
 ### HTTP vs HTTPS Traffic Comparison
 
 [Describe what you captured in Wireshark. On HTTP you can see plaintext credentials in the packet payload. On HTTPS the payload is encrypted and unreadable.]
 
-![Wireshark HTTP](images/Wireshark_http.png)
+![wireshark http](images/wireshark_http.png)
 
-![Wireshark HTTPS](images/Wireshark_https.png)
+![wireshark https](images/wireshark_https.png)
 
 ---
 
