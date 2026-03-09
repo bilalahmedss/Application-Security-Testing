@@ -31,7 +31,8 @@
 5. [Security Analysis](#5-security-analysis)
 6. [OWASP Top 10 Mapping](#6-owasp-top-10-mapping)
 7. [Conclusion](#7-conclusion)
-8. [GitHub Repository](#8-github-repository)
+8. [Bonus: Nginx + HTTPS](#8-bonus-nginx--https)
+9. [GitHub Repository](#9-github-repository)
 
 ---
 
@@ -949,7 +950,7 @@ The pattern across all three levels shows that security comes from correct desig
 
 ---
 
-## 7. Conclusion
+## 7: Conclusion
 
 Testing DVWA across three security levels made one thing clear: the difference between vulnerable and secure code is not about effort, it's about approach.
 
@@ -964,6 +965,85 @@ If I were auditing a production application, I would start by looking for any pl
 The broader takeaway is that most real-world breaches do not require novel techniques. They exploit the same classes of vulnerability demonstrated here, against applications that never moved past Medium.
 
 ---
+
+## 8: Bonus: Nginx + HTTPS
+
+### Setup Overview
+
+DVWA was deployed behind an Nginx reverse proxy using Docker Compose. Nginx handles all incoming traffic on ports 8080 (HTTP) and 8443 (HTTPS), forwarding requests to the DVWA container on its internal port 80. The DVWA container has no ports exposed directly to the host.
+
+The docker-compose.yml defines two services: `dvwa` using the `vulnerables/web-dvwa` image with port 80 exposed only internally, and `nginx` using `nginx:alpine` with ports 8080 and 8443 bound to the host.
+
+---
+
+### Nginx Configuration
+
+![nginx config](images/nginx_conf.png)
+
+Nginx runs two server blocks. The first listens on port 80 and issues a 301 permanent redirect to HTTPS on port 8443, forcing all HTTP traffic to upgrade. The second listens on port 443 with SSL enabled, loads the self-signed certificate and key from `/etc/nginx/certs/`, and proxies all requests to the DVWA container at `http://dvwa:80` using Docker's internal DNS.
+
+---
+
+### Self-Signed Certificate
+
+```bash
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout certs/nginx.key \
+  -out certs/nginx.crt \
+  -subj "//C=PK\ST=Sindh\L=Karachi\O=HabibUniversity\CN=localhost"
+```
+
+![openssl output](images/openssl.png)
+
+A 2048-bit RSA self-signed certificate was generated using OpenSSL. The certificate is valid for 365 days. Because it is self-signed rather than issued by a trusted CA, browsers display a certificate warning on first visit.
+
+![browser warning](images/browser.png)
+
+After proceeding past the warning, DVWA loads over HTTPS at `https://localhost:8443`.
+
+![dvwa over https](images/browser2.png)
+
+---
+
+### Certificate Details
+
+![certificate details](images/certificate.png)
+
+The certificate viewer confirms:
+
+- **Common Name (CN):** localhost
+- **Organization (O):** HabibUniversity
+- **Issued On:** Monday, March 9, 2026
+- **Expires On:** Tuesday, March 9, 2027
+- The certificate is self-signed, meaning it was issued by the same entity it was issued to.
+
+---
+
+### HTTP vs HTTPS Traffic Comparison
+
+#### HTTP — Plaintext Credentials Visible
+
+![wireshark http](images/http.png)
+
+With Nginx configured to proxy HTTP directly on port 8080, a Wireshark capture on the loopback adapter captured the login request in full. Following the HTTP stream shows the POST body in plaintext:
+
+```
+username=admin&password=password&Login=Login
+```
+
+The credentials, session cookie, and all request headers are fully readable to anyone with access to the network traffic.
+
+#### HTTPS — Traffic Encrypted
+
+![wireshark https](images/https.png)
+
+With the 301 redirect restored and HTTPS enforced on port 8443, the same login attempt produces only TLSv1.3 packets. Following the TLS stream returns an empty window — no readable content. The entire HTTP conversation including credentials, cookies, and headers is encrypted inside the TLS tunnel before leaving the browser.
+
+---
+
+### Key Difference
+
+HTTP sends everything in plaintext. A passive observer on the same network captures credentials with no effort. HTTPS wraps the entire session in TLS 1.3, making the payload unreadable without the private key. The Wireshark captures above demonstrate this directly: one shows `username=admin&password=password` in clear text, the other shows nothing.
 
 ## 8. GitHub Repository
 
